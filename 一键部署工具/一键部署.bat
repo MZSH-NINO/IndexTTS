@@ -330,13 +330,53 @@ if %errorlevel% neq 0 (
 if exist pyproject.toml.bak move /Y pyproject.toml.bak pyproject.toml >nul
 
 echo [4/5] 安装 ffmpeg...
+where ffmpeg >nul 2>&1
+if %errorlevel% equ 0 (
+    echo [✓] ffmpeg 已安装
+    goto ffmpeg_installed
+)
+
+echo [信息] ffmpeg 未安装，正在尝试自动安装...
 where conda >nul 2>&1
 if %errorlevel% equ 0 (
+    echo [信息] 使用 Conda 安装 ffmpeg...
     conda install -c conda-forge ffmpeg -y
-) else (
-    echo [⚠️] 未检测到 Conda，请手动安装 ffmpeg
-    echo [提示] 下载地址：https://ffmpeg.org/download.html
+    if %errorlevel% equ 0 (
+        echo [✓] ffmpeg 安装成功
+        goto ffmpeg_installed
+    )
 )
+
+where choco >nul 2>&1
+if %errorlevel% equ 0 (
+    echo [信息] 使用 Chocolatey 安装 ffmpeg...
+    choco install ffmpeg -y
+    if %errorlevel% equ 0 (
+        echo [✓] ffmpeg 安装成功
+        goto ffmpeg_installed
+    )
+)
+
+echo [⚠️] 自动安装失败，正在下载便携版 ffmpeg...
+if not exist "ffmpeg\" mkdir ffmpeg
+echo [信息] 下载 ffmpeg-7.1-essentials_build.zip (约 80MB)...
+powershell -Command "& {[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri 'https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip' -OutFile 'ffmpeg\ffmpeg.zip'}"
+if %errorlevel% equ 0 (
+    echo [信息] 解压 ffmpeg...
+    powershell -Command "Expand-Archive -Path 'ffmpeg\ffmpeg.zip' -DestinationPath 'ffmpeg' -Force"
+    for /d %%i in (ffmpeg\ffmpeg-*) do set "FFMPEG_DIR=%%i"
+    echo [✓] ffmpeg 已安装到项目目录
+    echo [提示] ffmpeg 路径：%cd%\!FFMPEG_DIR!\bin
+    echo [提示] 请将该路径添加到系统 PATH 环境变量，或每次使用前设置：
+    echo         set PATH=%cd%\!FFMPEG_DIR!\bin;%%PATH%%
+) else (
+    echo [✗] ffmpeg 下载失败
+    echo [提示] 请手动下载并安装 ffmpeg：
+    echo         https://ffmpeg.org/download.html
+    echo [提示] 或使用 Chocolatey：choco install ffmpeg
+)
+
+:ffmpeg_installed
 
 echo [5/5] 验证 GPU 加速...
 if "!DEVICE_TYPE!"=="cuda" (
